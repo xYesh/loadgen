@@ -400,16 +400,24 @@ func genHexStringWithCardinality(rng Rng, p1 string, p2 string) (func() any, err
 
 	var v1, length int
 	var err error
-	length, err = strconv.Atoi(p1)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not an int", p1)
+	if p1 != "" {
+		length, err = strconv.Atoi(p1)
+		if err != nil {
+			return nil, fmt.Errorf("%s is not an int", p1)
+		}
+		if length >= 64 {
+			return nil, fmt.Errorf("sxc length can only be a max of 63")
+		}
+	} else {
+		length = 16
 	}
-	if length >= 64 {
-		return nil, fmt.Errorf("sxc length can only be a max of 63")
-	}
-	v1, err = strconv.Atoi(p2)
-	if err != nil {
-		return nil, fmt.Errorf("%s is not an int", p2)
+	if p2 != "" {
+		v1, err = strconv.Atoi(p2)
+		if err != nil {
+			return nil, fmt.Errorf("%s is not an int", p2)
+		}
+	} else {
+		v1 = 16
 	}
 
 	return func() any {
