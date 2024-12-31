@@ -58,7 +58,7 @@ var nouns = []string{
 var constfield = regexp.MustCompile(`^([^/].*)$`)
 
 // genfield is used to parse generator fields by matching valid commands and numeric arguments
-var genfield = regexp.MustCompile(`^/([ibfsuk][awxrgqtp][c]?)([0-9.-]+)?(?:,([0-9.-]+))?(?:,([0-9.-]+))?(?:,([0-9.-]+))?$`)
+var genfield = regexp.MustCompile(`^/([ibfsuk][awxrgqtp]?[c]?)([0-9.-]+)?(?:,([0-9.-]+))?(?:,([0-9.-]+))?(?:,([0-9.-]+))?$`)
 
 // keysplitter separates fields that look like number.name (ex: 1.myfield)
 var keysplitter = regexp.MustCompile(`^([0-9]+)\.(.*$)`)
