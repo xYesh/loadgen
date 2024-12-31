@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/rand"
@@ -56,8 +58,7 @@ var nouns = []string{
 var constfield = regexp.MustCompile(`^([^/].*)$`)
 
 // genfield is used to parse generator fields by matching valid commands and numeric arguments
-// the second parameter, if it exists, includes the comma
-var genfield = regexp.MustCompile(`^/([ibfsuk][awxrgqt]?)([0-9.-]+)?(,[0-9.-]+)?$`)
+var genfield = regexp.MustCompile(`^/([ibfsuk][awxrgqtp][c]?)([0-9.-]+)?(?:,([0-9.-]+))?(?:,([0-9.-]+))?(?:,([0-9.-]+))?$`)
 
 // keysplitter separates fields that look like number.name (ex: 1.myfield)
 var keysplitter = regexp.MustCompile(`^([0-9]+)\.(.*$)`)
@@ -265,7 +266,14 @@ func parseUserFields(rng Rng, userfields map[string]string) (map[string]func() a
 		gentype := matches[1]
 		p1 := matches[2]
 		p2 := matches[3]
+		p3 := matches[4]
+		p4 := matches[5]
 		switch gentype {
+		case "ip":
+			fields[name], err = getIpGen(rng, p1, p2, p3, p4)
+			if err != nil {
+				return nil, fmt.Errorf("invalid int in user field %s=%s: %w", name, value, err)
+			}
 		case "i", "ir", "ig":
 			fields[name], err = getIntGen(rng, gentype, p1, p2)
 			if err != nil {
@@ -286,7 +294,7 @@ func parseUserFields(rng Rng, userfields map[string]string) (map[string]func() a
 				}
 			}
 			fields[name] = func() any { return rng.BoolWithProb(n) }
-		case "s", "sw", "sx", "sa", "sq":
+		case "s", "sw", "sx", "sa", "sq", "sxc":
 			n := 16
 			if p1 != "" {
 				n, err = strconv.Atoi(p1)
@@ -305,6 +313,11 @@ func parseUserFields(rng Rng, userfields map[string]string) (map[string]func() a
 				fields[name] = func() any { return rng.QuadraticChoice(words) }
 			case "sx":
 				fields[name] = func() any { return rng.HexString(n) }
+			case "sxc":
+				fields[name], err = genHexStringWithCardinality(rng, p1, p2)
+				if err != nil {
+					return nil, fmt.Errorf("invalid int in user field %s=%s: %w", name, value, err)
+				}
 			default:
 				fields[name] = func() any { return rng.String(n) }
 			}
@@ -331,7 +344,7 @@ func parseUserFields(rng Rng, userfields map[string]string) (map[string]func() a
 				}
 			}
 			if p2 != "" {
-				fives, err = strconv.ParseFloat(p2[1:], 64)
+				fives, err = strconv.ParseFloat(p2, 64)
 				if err != nil {
 					return nil, fmt.Errorf("invalid float in user field %s=%s: %w", name, value, err)
 				}
@@ -383,6 +396,64 @@ func gaussianDefaults(v1, v2 float64) (float64, float64) {
 	return v1, v2
 }
 
+func genHexStringWithCardinality(rng Rng, p1 string, p2 string) (func() any, error) {
+
+	var v1, length int
+	var err error
+	length, err = strconv.Atoi(p1)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not an int", p1)
+	}
+	if length >= 64 {
+		return nil, fmt.Errorf("sxc length can only be a max of 63")
+	}
+	v1, err = strconv.Atoi(p2)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not an int", p2)
+	}
+
+	return func() any {
+		var number = rng.rng.Intn(v1)
+
+		data := fmt.Sprintf("%d:%d", number, length)
+		//Can switch to non-cryptographic hashes for higher throughputs
+		hash := sha256.Sum256([]byte(data))
+		hashString := hex.EncodeToString(hash[:])
+
+		// Truncate the hash to the specified length
+		if length > len(hashString) {
+			return hashString
+		}
+		return hashString[:length]
+	}, nil
+}
+
+func getIpGen(rng Rng, p1, p2, p3, p4 string) (func() any, error) {
+
+	var v1, v2, v3, v4 int
+	var err error
+	v1, err = strconv.Atoi(p1)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not an int", p1)
+	}
+	v2, err = strconv.Atoi(p2)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not an int", p2)
+	}
+	v3, err = strconv.Atoi(p3)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not an int", p3)
+	}
+	v4, err = strconv.Atoi(p4)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not an int", p4)
+	}
+
+	return func() any {
+		return fmt.Sprintf("%d.%d.%d.%d", rng.rng.Intn(v1), rng.rng.Intn(v2), rng.rng.Intn(v3), rng.rng.Intn(v4))
+	}, nil
+}
+
 func getIntGen(rng Rng, gentype, p1, p2 string) (func() any, error) {
 	var v1, v2 int
 	var err error
@@ -398,7 +469,7 @@ func getIntGen(rng Rng, gentype, p1, p2 string) (func() any, error) {
 		v2 = v1
 		v1 = 0
 	} else {
-		v2, err = strconv.Atoi(p2[1:])
+		v2, err = strconv.Atoi(p2)
 		if err != nil {
 			return nil, fmt.Errorf("%s is not an int", p2[:1])
 		}
@@ -429,7 +500,7 @@ func getFloatGen(rng Rng, gentype, p1, p2 string) (func() any, error) {
 		v2 = v1
 		v1 = 0
 	} else {
-		v2, err = strconv.ParseFloat(p2[1:], 64)
+		v2, err = strconv.ParseFloat(p2, 64)
 		if err != nil {
 			return nil, fmt.Errorf("%s is not a number", p2[:1])
 		}
@@ -456,7 +527,7 @@ func getURLGen(rng Rng, gentype, p1, p2 string) (func() any, error) {
 		}
 	}
 	if p2 != "" && p2 != "," {
-		c2, err = strconv.Atoi(p2[1:])
+		c2, err = strconv.Atoi(p2)
 		if err != nil {
 			return nil, fmt.Errorf("%s is not a number", p2[:1])
 		}
@@ -496,7 +567,7 @@ func getKeyGen(rng Rng, p1, p2 string) (func() any, error) {
 	if p2 == "" || p2 == "," {
 		period = 60
 	} else {
-		period, err = strconv.Atoi(p2[1:])
+		period, err = strconv.Atoi(p2)
 		if err != nil {
 			return nil, fmt.Errorf("%s is not an int", p2[:1])
 		}
