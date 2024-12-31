@@ -136,6 +136,7 @@ more than one.
 |----|---------|-|---|
 | i, ir| rectangularly distributed integers | min (0)| max (100)|
 | ig | gaussian integers | mean (100)| stddev (10)|
+| ip | ip address | p1,p2,p3,p4 | ||
 | f, fr| rectangularly distributed floats | min (0)| max (100) |
 | fg | gaussian floats | mean (100)| stddev (10)|
 | b | boolean | percentage true (50) ||
@@ -143,6 +144,7 @@ more than one.
 | sw | pronounceable words, rectangular distribution | cardinality (16)||
 | sq | pronounceable words, quadratic distribution | cardinality (16) ||
 | sx | hexadecimal string | length in chars (16)||
+| sxc | hexadecimal string with cardinality | length in chars | cardinality ||
 | k  | key fields used for testing intermittent key cardinality | cardinality (50) | period (60) |
 | u | url-like (2 parts) | cardinality of 1st part (3) | cardinality of 2nd part (10) |
 | uq | url with random query | cardinality of 1st part (3) | cardinality of 2nd part (10) |
@@ -163,6 +165,8 @@ where `0` means the root span.
 	* url=/u10,10 -- simulate URLs for 10 services, each of which has 10 endpoints
 	* status=/st10,0.1 -- generate status codes where 10% are 400s and .1% are 500s
 	* samplekey=/k50,60 -- generate sample keys with cardinality 50 but not all keys will occur before 60s
+	* peer=/ip1,1,1,256 -- generates IP addresses where we specify cardinality at every part level
+	* uuid=/sxc8,1000 -- uuid is a string of 8 random hex characters with a cardinality of 1000
 
 ## Motivation
 
