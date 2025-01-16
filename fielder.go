@@ -663,7 +663,7 @@ func (f *Fielder) AddFields(span trace.Span, count int64, level int) {
 	//pick the random index of the keys and iterate over to 10 fields.
 	start := rand.Intn(len(f.keys) - 10)
 	for i := start; i < start+10; i++ {
-		key := keys[i%len(keys)]
+		key := f.keys[i%len(f.keys)]
 		val := f.fields[key]
 		key, ok := f.atLevel(key, level)
 		if !ok {
