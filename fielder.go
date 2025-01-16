@@ -588,6 +588,7 @@ func getKeyGen(rng Rng, p1, p2 string) (func() any, error) {
 type Fielder struct {
 	fields map[string]func() any
 	names  []string
+	keys   []string
 }
 
 // Fielder is an object that takes a name and generates a map of
@@ -648,6 +649,7 @@ func (f *Fielder) GetFields(count int64, level int) map[string]any {
 		if !ok {
 			continue
 		}
+		f.keys = append(f.keys, k)
 		fields[k] = v()
 	}
 	return fields
@@ -658,7 +660,11 @@ func (f *Fielder) AddFields(span trace.Span, count int64, level int) {
 	if count != 0 {
 		attrs = append(attrs, attribute.Int64("count", count))
 	}
-	for key, val := range f.fields {
+	//pick the random index of the keys and iterate over to 10 fields.
+	start := rand.Intn(len(f.keys) - 10)
+	for i := start; i < start+10; i++ {
+		key := keys[i%len(keys)]
+		val := f.fields[key]
 		key, ok := f.atLevel(key, level)
 		if !ok {
 			continue
