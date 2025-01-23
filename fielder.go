@@ -603,6 +603,7 @@ func NewFielder(seed string, userFields map[string]string, nextras, nservices in
 	rng := NewRng(seed)
 	gens := rng.getValueGenerators()
 	fields, err := parseUserFields(rng, userFields)
+	var keys []string
 	if err != nil {
 		return nil, err
 	}
@@ -611,12 +612,14 @@ func NewFielder(seed string, userFields map[string]string, nextras, nservices in
 		fields[fieldname] = gens[rng.Intn(len(gens))]
 	}
 	fields["process_id"] = func() any { return getProcessID() }
-
+	for k, _ := range fields {
+		keys = append(keys, k)
+	}
 	names := make([]string, nservices)
 	for i := 0; i < nservices; i++ {
 		names[i] = rng.Choice(spices)
 	}
-	return &Fielder{fields: fields, names: names}, nil
+	return &Fielder{fields: fields, names: names, keys: keys}, nil
 }
 
 func (f *Fielder) GetServiceName(n int) string {
@@ -649,7 +652,6 @@ func (f *Fielder) GetFields(count int64, level int) map[string]any {
 		if !ok {
 			continue
 		}
-		f.keys = append(f.keys, k)
 		fields[k] = v()
 	}
 	return fields
@@ -661,6 +663,7 @@ func (f *Fielder) AddFields(span trace.Span, count int64, level int) {
 		attrs = append(attrs, attribute.Int64("count", count))
 	}
 	//pick the random index of the keys and iterate over to 10 fields.
+
 	start := rand.Intn(len(f.keys) - 10)
 	for i := start; i < start+10; i++ {
 		key := f.keys[i%len(f.keys)]
