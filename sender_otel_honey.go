@@ -9,6 +9,7 @@ import (
 	"github.com/honeycombio/otel-config-go/otelconfig"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -88,6 +89,7 @@ func (t *SenderOTel) CreateTrace(ctx context.Context, name string, fielder *Fiel
 	fielder.AddFields(root, count, 0)
 	var ots OTelSendable
 	ots.Span = root
+	ots.Span.SetStatus(codes.Ok, "Everything's good")
 	return ctx, ots
 }
 
@@ -100,6 +102,9 @@ func (t *SenderOTel) CreateSpan(ctx context.Context, name string, level int, fie
 			attribute.KeyValue{Key: "exception.stacktrace", Value: attribute.StringValue("stacktrace")},
 			attribute.KeyValue{Key: "exception.escaped", Value: attribute.BoolValue(false)},
 		))
+		span.SetStatus(codes.Error, "Somethings wrong")
+	} else {
+		span.SetStatus(codes.Ok, "Everything's good")
 	}
 	fielder.AddFields(span, 0, level)
 	var ots OTelSendable
