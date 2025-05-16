@@ -586,9 +586,11 @@ func getKeyGen(rng Rng, p1, p2 string) (func() any, error) {
 }
 
 type Fielder struct {
-	fields map[string]func() any
-	names  []string
-	keys   []string
+	fields              map[string]func() any
+	names               []string
+	keys                []string
+	attributesPerSpan   int
+	intrinsicAttributes int
 }
 
 // Fielder is an object that takes a name and generates a map of
@@ -599,7 +601,7 @@ type Fielder struct {
 // combining an adjective and a noun and are consistent for a given fielder.
 // The field values are randomly generated.
 // Fielder also includes the process_id.
-func NewFielder(seed string, userFields map[string]string, nextras, nservices int) (*Fielder, error) {
+func NewFielder(seed string, userFields map[string]string, nextras, nservices int, attributesPerSpan int, intrinsicAttributes int) (*Fielder, error) {
 	rng := NewRng(seed)
 	gens := rng.getValueGenerators()
 	fields, err := parseUserFields(rng, userFields)
@@ -619,7 +621,10 @@ func NewFielder(seed string, userFields map[string]string, nextras, nservices in
 	for i := 0; i < nservices; i++ {
 		names[i] = rng.Choice(spices)
 	}
-	return &Fielder{fields: fields, names: names, keys: keys}, nil
+
+	var validAttributesPerSpan = int(math.Min(float64(attributesPerSpan), float64(len(fields))))
+	var validIntrinsicAttributes = int(math.Min(float64(intrinsicAttributes), float64(validAttributesPerSpan)))
+	return &Fielder{fields: fields, names: names, keys: keys, attributesPerSpan: validAttributesPerSpan, intrinsicAttributes: validIntrinsicAttributes}, nil
 }
 
 func (f *Fielder) GetServiceName(n int) string {
@@ -659,33 +664,50 @@ func (f *Fielder) GetFields(count int64, level int) map[string]any {
 
 func (f *Fielder) AddFields(span trace.Span, count int64, level int) {
 	attrs := make([]attribute.KeyValue, 0, 1+len(f.fields))
+
 	if count != 0 {
 		attrs = append(attrs, attribute.Int64("count", count))
 	}
-	//pick the random index of the keys and iterate over to 10 fields.
 
-	start := rand.Intn(len(f.keys) - 10)
-	for i := start; i < start+10; i++ {
-		key := f.keys[i%len(f.keys)]
-		val := f.fields[key]
-		key, ok := f.atLevel(key, level)
+	//pick the random index of the keys and iterate over
+	start := rand.Intn(len(f.keys) - f.attributesPerSpan + 1)
+
+
+	
+	for i := 0; i < f.attributesPerSpan; i++ {
+		keyIndex := (start + i) % len(f.keys) // Modulo for safety, though start+i should be in bounds.
+		key := f.keys[keyIndex]
+
+		valFunc, fieldExists := f.fields[key]
+		if !fieldExists || valFunc == nil { // Check if key exists in map and func is not nil
+			continue
+		}
+
+		processedKey, ok := f.atLevel(key, level)
 		if !ok {
 			continue
 		}
-		switch v := val().(type) {
+
+		switch v := valFunc().(type) {
 		case int64:
-			attrs = append(attrs, attribute.Int64(key, v))
+			attrs = append(attrs, attribute.Int64(processedKey, v))
 		case uint64:
-			attrs = append(attrs, attribute.Int64(key, int64(v)))
+			attrs = append(attrs, attribute.Int64(processedKey, int64(v)))
 		case float64:
-			attrs = append(attrs, attribute.Float64(key, v))
+			attrs = append(attrs, attribute.Float64(processedKey, v))
 		case string:
-			attrs = append(attrs, attribute.String(key, v))
+			attrs = append(attrs, attribute.String(processedKey, v))
 		case bool:
-			attrs = append(attrs, attribute.Bool(key, v))
+			attrs = append(attrs, attribute.Bool(processedKey, v))
 		default:
-			panic(fmt.Sprintf("unknown type %T for %s -- implementation error in fielder.go", v, key))
+			// Consider logging this error instead of panicking if this code is part of a library,
+			// unless a panic is the desired behavior for an unrecoverable state.
+			panic(fmt.Sprintf("unknown type %T for %s -- implementation error in fielder.go", v, processedKey))
 		}
 	}
+	// Print the attributes for debugging
+	fmt.Print("attrs: ")
+	fmt.Println(len(attrs))
+	fmt.Println()
 	span.SetAttributes(attrs...)
 }
