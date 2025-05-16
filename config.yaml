@@ -1,0 +1,71 @@
+telemetry:
+  host: http://localhost:4318/v1/traces
+  insecure: true
+  dataset: generatorTest-1
+format:
+  apspan: 10
+  iattributes: 5
+  depth: 10
+  nspans: 100
+  tracetime: 1s
+quantity:
+  tps: 100 # 1000 * 10 nspans = 10,000/s
+  runtime: 24h
+  ramptime: 5s
+output:
+  sender: otel
+  protocol: protobuf
+global:
+  loglevel: warn
+fields:
+  otel.library.name: io.opentelemetry
+  otel.library.version: /sq10
+  otel.scope.name: /sw500
+  otel.scope.version: /sq10
+  http.method: /sq8
+  http.url: /u10,10000
+  http.target: /uq10,1000
+  http.host: /u
+  http.scheme: /sq10
+  http.status_code: /st1,0.1
+  http.request_content_length: /ir0,1000
+  http.response_content_length: /ir0,10000
+  net.peer.ip: /ip2,2,10,256
+  net.peer.port: /i
+  db.system: /sw10
+  db.user: /sw10000
+  db.name: /sw10000
+  db.statement: /uq10,10000
+  db.operation: /sw10
+  net.peer.name: /u
+  messaging.system: /sw10
+  messaging.destination: /sw1000
+  messaging.destination_kind: /sw10
+  messaging.message_id: /sx
+  messaging.operation: /sw10
+  cache.hit: /b
+  cache.key: /sx
+  cache.expiration: /ir600
+  process.runtime.name: /sw10
+  process.runtime.version: /sw50
+  process.pid: /i50000
+  file.path: /uq10,10000
+  file.operation: /sw10
+  file.size: /ig2048,50
+  event.name: /sw10000
+  event.domain: /sw1000
+  messaging.destination.dup: /sw1000
+  messaging.destination_kind.dup: /sw10
+  messaging.message_id.dup: /sx
+  messaging.operation.dup: /sw10
+  cache.hit.dup: /b
+  cache.key.dup: /sx
+  cache.expiration.dup: /ir600
+  process.runtime.name.dup: /sw10
+  process.runtime.version.dup: /sw50
+  process.pid.dup: /i50000
+  file.path.dup: /uq10,10000
+  file.operation.dup: /sw10
+  file.size.dup: /ig2048,50
+  event.name.dup: /sw10000
+  event.domain.dup: /sw1000

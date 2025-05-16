@@ -30,8 +30,8 @@ type Options struct {
 	} `group:"Telemetry Options"`
 	Format struct {
 		Depth               int           `long:"depth" description:"the nesting depth of each trace" default:"3"`
-		AttributesPerSpan   int           `long:"apspan" description:"the number of attributes per span" default:"100"`
-		IntrinsicAttributes int           `long:"iattributes" description:"the number of attributes per span" default:"100"`
+		AttributesPerSpan   int           `long:"apspan" yaml:"apspan" description:"the number of attributes per span" default:"3"`
+		IntrinsicAttributes int           `long:"iattributes" yaml:"iattributes" description:"the number of attributes per span" default:"3"`
 		NSpans              int           `long:"nspans" description:"the total number of spans in a trace" default:"3"`
 		Extra               int           `long:"extra" description:"the number of random fields in a span beyond the standard ones" default:"0" yaml:",omitempty"`
 		TraceTime           time.Duration `long:"tracetime" description:"the duration of a trace" default:"1s"`
@@ -210,6 +210,7 @@ func main() {
 			log.Fatalf("err %v -- unable to read config file %s", err, cmdopts.Global.Config)
 		}
 		opts.CopyStarredFieldsFrom(cmdopts)
+		fmt.Println("read config = ", opts.Format.IntrinsicAttributes)
 	} else {
 		opts = cmdopts // we don't have to read from a file
 	}
