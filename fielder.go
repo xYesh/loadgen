@@ -669,45 +669,107 @@ func (f *Fielder) AddFields(span trace.Span, count int64, level int) {
 		attrs = append(attrs, attribute.Int64("count", count))
 	}
 
-	//pick the random index of the keys and iterate over
-	start := rand.Intn(len(f.keys) - f.attributesPerSpan + 1)
+	processedKeys := make(map[string]struct{}) // To keep track of keys already added
 
+	var numAdditionalRandomFields = f.attributesPerSpan - f.intrinsicAttributes
 
-	
-	for i := 0; i < f.attributesPerSpan; i++ {
-		keyIndex := (start + i) % len(f.keys) // Modulo for safety, though start+i should be in bounds.
-		key := f.keys[keyIndex]
-
-		valFunc, fieldExists := f.fields[key]
-		if !fieldExists || valFunc == nil { // Check if key exists in map and func is not nil
+	//Setting intrinsic attributes here
+	for i := 0; i < f.intrinsicAttributes; i++ {
+		key := f.keys[i]
+		if _, exists := processedKeys[key]; exists { // Should not happen if f.keys has unique elements
 			continue
 		}
 
-		processedKey, ok := f.atLevel(key, level)
+		valFunc, fieldExists := f.fields[key]
+		if !fieldExists || valFunc == nil {
+			continue
+		}
+
+		processedKeyName, ok := f.atLevel(key, level)
 		if !ok {
 			continue
 		}
 
+		// Add to attributes and mark as processed
 		switch v := valFunc().(type) {
 		case int64:
-			attrs = append(attrs, attribute.Int64(processedKey, v))
+			attrs = append(attrs, attribute.Int64(processedKeyName, v))
 		case uint64:
-			attrs = append(attrs, attribute.Int64(processedKey, int64(v)))
+			attrs = append(attrs, attribute.Int64(processedKeyName, int64(v)))
 		case float64:
-			attrs = append(attrs, attribute.Float64(processedKey, v))
+			attrs = append(attrs, attribute.Float64(processedKeyName, v))
 		case string:
-			attrs = append(attrs, attribute.String(processedKey, v))
+			attrs = append(attrs, attribute.String(processedKeyName, v))
 		case bool:
-			attrs = append(attrs, attribute.Bool(processedKey, v))
+			attrs = append(attrs, attribute.Bool(processedKeyName, v))
 		default:
-			// Consider logging this error instead of panicking if this code is part of a library,
-			// unless a panic is the desired behavior for an unrecoverable state.
-			panic(fmt.Sprintf("unknown type %T for %s -- implementation error in fielder.go", v, processedKey))
+			panic(fmt.Sprintf("unknown type %T for %s -- implementation error in fielder.go", v, processedKeyName))
+		}
+		processedKeys[key] = struct{}{}
+	}
+
+	//Setting additional random attributes here.
+	if numAdditionalRandomFields > 0 {
+		// Create a pool of candidate keys for random selection:
+		// These are keys in f.keys that were NOT processed as intrinsic.
+		candidateRandomKeys := make([]string, 0, len(f.keys)-f.intrinsicAttributes)
+		// A more direct way if intrinsic keys are always from the start:
+		if f.intrinsicAttributes < len(f.keys) {
+			candidateRandomKeys = f.keys[f.intrinsicAttributes:]
+		}
+
+		if len(candidateRandomKeys) > 0 {
+			effectiveNumAdditionalRandom := numAdditionalRandomFields
+			if effectiveNumAdditionalRandom > len(candidateRandomKeys) {
+				effectiveNumAdditionalRandom = len(candidateRandomKeys) // Cap at available unique candidates
+			}
+
+			// Randomly select 'effectiveNumAdditionalRandom' keys from 'candidateRandomKeys'
+			// Using the same random block selection logic as before
+			startRandom := 0
+			if len(candidateRandomKeys) > effectiveNumAdditionalRandom {
+				startRandom = rand.Intn(len(candidateRandomKeys) - effectiveNumAdditionalRandom + 1)
+			}
+
+			for i := 0; i < effectiveNumAdditionalRandom; i++ {
+				randomKeyIndex := startRandom + i
+				key := candidateRandomKeys[randomKeyIndex]
+
+				// This check is important if f.keys could have duplicates,
+				// or if somehow a key from the random pool was already in processedKeys
+				// (though with strict partitioning, this shouldn't be the case for the latter).
+				if _, exists := processedKeys[key]; exists {
+					continue
+				}
+
+				valFunc, fieldExists := f.fields[key]
+				if !fieldExists || valFunc == nil {
+					continue
+				}
+
+				processedKeyName, ok := f.atLevel(key, level)
+				if !ok {
+					continue
+				}
+
+				// Add to attributes and mark as processed
+				switch v := valFunc().(type) {
+				case int64:
+					attrs = append(attrs, attribute.Int64(processedKeyName, v))
+				case uint64:
+					attrs = append(attrs, attribute.Int64(processedKeyName, int64(v)))
+				case float64:
+					attrs = append(attrs, attribute.Float64(processedKeyName, v))
+				case string:
+					attrs = append(attrs, attribute.String(processedKeyName, v))
+				case bool:
+					attrs = append(attrs, attribute.Bool(processedKeyName, v))
+				default:
+					panic(fmt.Sprintf("unknown type %T for %s -- implementation error in fielder.go", v, processedKeyName))
+				}
+				processedKeys[key] = struct{}{} // Mark this random key as processed
+			}
 		}
 	}
-	// Print the attributes for debugging
-	fmt.Print("attrs: ")
-	fmt.Println(len(attrs))
-	fmt.Println()
 	span.SetAttributes(attrs...)
 }
